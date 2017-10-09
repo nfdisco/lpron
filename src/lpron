@@ -136,7 +136,7 @@ if __name__ == '__main__':
     except Error as e:
         logging.error(e)
         raise SystemExit(1)
-    
+
     if not results:
         logging.info('no match for ‘{}’'.format(args.word))
         raise SystemExit(0)
