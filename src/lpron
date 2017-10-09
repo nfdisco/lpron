@@ -1,0 +1,167 @@
+#! /usr/bin/env python3
+
+import os
+import logging
+import sqlite3
+import re
+import sys
+import lxml.etree
+import textwrap
+
+
+PROG = 'lpron'
+
+XML_TAG = re.compile('</?[^>]*>')
+
+
+class Error(Exception): pass
+
+
+def data_dirs():
+    dirs = [os.getenv('XDG_DATA_HOME', '~/.local/share')]
+    dirs.extend(os.getenv('XDG_DATA_DIRS',
+                          '/usr/local/share:/usr/share').split(':'))
+    return tuple(os.path.expanduser(os.path.join(d, PROG)) for d in dirs)
+
+
+def stylesheet_dir():
+    for d in DATA_DIRS:
+        p = os.path.join(d, 'xslt')
+        if os.path.exists(p):
+            return p
+    else:
+        raise Error('could not locate stylesheets directory')
+
+
+def database_dir():
+    for d in DATA_DIRS:
+        p = os.path.join(d, 'db')
+        if os.path.exists(p):
+            return p
+    else:
+        raise Error('could not locate database directory')
+
+
+def query(db, query_string, parameters):
+    try:
+        connection = sqlite3.connect(db)
+        try:
+            result = connection.execute(query_string, parameters).fetchall()
+        finally:
+            connection.close()
+    except (sqlite3.Error, sqlite3.Warning, Error) as e:
+        logging.error(e)
+        raise Error('database lookup failure')
+    return result
+
+
+def lookup_headword(word, limit):
+    return query(os.path.join(DATABASE_DIR, 'hwd.db'),
+                 'select label, a_id from hwd where search like ? limit ?',
+                 [word, limit])
+
+
+def lookup_entry(a_id):
+    return query(os.path.join(DATABASE_DIR, 'fs.db'),
+                 'select content from files where a_file = ?', [a_id])
+
+
+def display_choices(results):
+    for i, result in enumerate(results):
+        print('{}  '.format(i + 1) + re.sub(XML_TAG, '', result[0]))
+    print()
+
+
+def ask_integer(prompt, n):
+    while True:
+        print(prompt, end='', flush=True)
+        answer = sys.stdin.readline()
+        try:
+            integer = int(answer.rstrip(), 10)
+        except:
+            pass
+        if not integer < 1 and not integer > n:
+            print('----')
+            return integer
+        print('enter an integer between 1 and {}'.format(n))
+
+
+def display_entry(entry):
+    transform = lxml.etree.XSLT(
+        lxml.etree.parse(os.path.join(STYLESHEET_DIR, 'entry.xml')))
+    html = lxml.etree.fromstring(entry).getroottree()
+    for paragraph in str(transform(html)).rstrip().split('\n'):
+        print(textwrap.fill(paragraph))
+
+
+if __name__ == '__main__':
+
+    import argparse
+    import signal
+
+    # avoid broken pipe/keyboard interrupt exceptions
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    parser = argparse.ArgumentParser(
+        prog='lpd-cli',
+        description='Interface to Longman Pronunciation Dictionary.')
+    parser.add_argument('word')
+    parser.add_argument('--html', action='store_true',
+                        help='write raw html data to stdout')
+    parser.add_argument('-l', '--log-level', metavar='LEVEL',
+                        choices=('debug', 'info', 'warning', 'error'),
+                        default='info',
+                        help='set log level')
+
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=getattr(logging, args.log_level.upper()))
+
+    DATA_DIRS = data_dirs()
+
+    logging.debug('data dirs: {}'.format(DATA_DIRS))
+
+    DATABASE_DIR = database_dir()
+
+    STYLESHEET_DIR = stylesheet_dir()
+
+    logging.debug('database dir is ‘{}’'.format(DATABASE_DIR))
+    logging.debug('stylesheet dir is ‘{}’'.format(DATABASE_DIR))
+
+    try:
+        results = lookup_headword(args.word, 9)
+    except Error as e:
+        logging.error(e)
+        raise SystemExit(1)
+    
+    if not results:
+        logging.info('no match for ‘{}’'.format(args.word))
+        raise SystemExit(0)
+
+    n = len(results)
+    if n > 1:
+        display_choices(results)
+        i = ask_integer('which one? ', n) - 1
+    else:
+        i = 0
+    a_id = results[i][1]
+    entries = lookup_entry(a_id)
+    if not entries:
+        logging.error('no such entry: {}'.format(a_id))
+        raise SystemExit(1)
+
+    for entry in entries:
+        html_data = entry[0].decode('utf-8')
+        if args.html:
+            print(html_data)
+        else:
+            try:
+                display_entry(html_data)
+            except Exception as e:
+                logging.error(e)
+                logging.error('failure displaying dictionary entry')
+                raise SystemExit(1)
+
