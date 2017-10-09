@@ -1,0 +1,13 @@
+Makefile
+Makefile.in
+aclocal.m4
+*.cache/
+config.log
+config.status
+configure
+data/Makefile
+data/Makefile.in
+data/db/
+install-sh
+missing
+src/Makefile
