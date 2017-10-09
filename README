@@ -1,0 +1,30 @@
+lpron
+=====
+
+A command-line interface to the Longman Pronunciation Dictionary.
+
+* Usage
+
+$ lpron berkeley
+Berkeley (i) ˈbɑːk li ǁ ˈbɑːrk-, (ii) ˈbɜːk li ǁ ˈbɝːk- —British and
+Irish places and names are (i), American places and names are (ii).
+
+* Requirements
+
+- Python 3
+- lxml
+- Data files from the LPD CD (2008) converted to SQLite format, which
+  must be copied to the data/db/ directory.
+
+* Installing
+
+$ aclocal
+$ automake -c --add-missing
+$ autoconf
+$ ./configure
+$ make && make install
+
+* Copyright
+
+This software is distributed under the terms of the GNU General Public
+License version 3.
