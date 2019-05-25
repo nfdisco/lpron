@@ -1,0 +1,20 @@
+Source: lpron
+Maintainer: nfdisco <nr9@posteo.de>
+Section: misc
+Priority: optional
+Build-Depends: debhelper (>= 10)
+
+Package: lpron
+Architecture: all
+Depends: python3, python3-lxml, lpron-data
+Description: Interface to Longman Pronunciation Dictionary
+ A command-line interface to Longman Pronunciation Dictionary.
+
+Package: lpron-data
+Architecture: all
+Depends: python3, python3-lxml
+Description: Interface to Longman Pronunciation Dictionary
+ A command-line interface to Longman Pronunciation Dictionary.
+ .
+ This package contains the dictionary data.
+
